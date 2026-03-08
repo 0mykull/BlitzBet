@@ -1,0 +1,1 @@
+import { Connection, PublicKey } from "@solana/web3.js"; import { parsePriceData } from "@pythnetwork/client"; const conn = new Connection("https://ssc-dao.genesysgo.net"); conn.getAccountInfo(new PublicKey("H6ARWtNPA5Za1KSmtR1QEjeT8hA7G1LhX4H7WEMN2y2P")).then(a => console.log(parsePriceData(a.data).price));

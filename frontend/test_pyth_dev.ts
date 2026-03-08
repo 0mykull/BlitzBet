@@ -1,0 +1,1 @@
+import { Connection, PublicKey } from "@solana/web3.js"; import { parsePriceData } from "@pythnetwork/client"; const conn = new Connection("https://api.devnet.solana.com"); conn.getAccountInfo(new PublicKey("J83w4HKfqxwcq3BEMMkPFSppX3gqekLyLw1GgG9A")).then(a => console.log(parsePriceData(a.data).price));
