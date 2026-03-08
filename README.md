@@ -1,8 +1,6 @@
 # BlitzBet
 
-Real-time Solana prediction market powered by MagicBlock Ephemeral Rollups.
-
-BlitzBet demonstrates sub-second trading mechanics by offloading game logic to an ephemeral state, bypassing Layer 1 latency while maintaining cryptographic security.
+Real-time Solana prediction market powered by MagicBlock Ephemeral Rollups (proof of concept).
 
 ## Architecture
 
@@ -75,9 +73,3 @@ Start the development server:
 ```bash
 bun dev
 ```
-
-## Deployment
-
-To deploy for public access, the programs must be deployed to Solana Devnet, and the frontend can be hosted on any static site provider (Vercel, Netlify).
-
-Ensure your `Anchor.toml` and frontend configuration point to the `devnet` cluster before building for production.
