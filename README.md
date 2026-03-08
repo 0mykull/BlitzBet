@@ -1,63 +1,73 @@
-# BlitzBet - Realtime Solana Prediction Market
+# BlitzBet
 
-BlitzBet is a lightning-fast, gamified Solana prediction market built on the **MagicBlock Ephemeral Rollups** infrastructure and the **BOLT ECS** framework.
+Real-time Solana prediction market powered by MagicBlock Ephemeral Rollups.
 
-This application demonstrates the power of sub-10ms ephemeral state transitions, allowing users to make 60-second predictions on the live SOL/USD price without suffering from standard L1 network congestion or high latency.
+BlitzBet demonstrates sub-second trading mechanics by offloading game logic to an ephemeral state, bypassing Layer 1 latency while maintaining cryptographic security.
 
-## 🚀 Features
+## Architecture
 
-- **Realtime Oracle**: Fetches ultra-fast tick data via the **Helius Digital Asset Standard (DAS) API**.
-- **Ephemeral Rollup Execution**: Utilizes MagicBlock's sub-10ms Fast-Path to completely bypass Solana base-layer latency when executing core game/trading logic.
-- **Automated ECS Pipeline**: Visually tracks the real-time progression of your wager across the 4 MagicBlock deployment stages:
-  1. _Initialize (L1)_: Lock wager into Escrow on Devnet.
-  2. _Delegate (L1 → ER)_: Transfer prediction state ownership to the MagicBlock Ephemeral Rollup.
-  3. _Execute Fast-Path (ER)_: Resolve the 60s prediction instantly inside the high-frequency rollup environment.
-  4. _Commit (ER → L1)_: Settle the final game state back to the Solana base layer.
-- **Sleek UI**: Modern, responsive, mobile-friendly interface designed like a high-end trading terminal.
+The system utilizes a dual-layer approach to achieve high-frequency interactions:
 
-## Quick Start
+1.  **Base Layer (Solana)**
+    Handles asset custody, escrow creation, and final settlement. This ensures funds are always secure on the main chain.
 
-### 1. Install Dependencies
+2.  **Ephemeral Layer (MagicBlock)**
+    Executes the core game loop and resolution logic. By delegating state to an Ephemeral Rollup (ER), the application achieves sub-10ms latency for real-time price tracking and resolution.
 
-Run this command in the `frontend` directory:
+## Tech Stack
+
+- **Frontend:** React, Vite, Anchor, Solana Wallet Adapter
+- **Smart Contracts:** Rust, Bolt (ECS Framework)
+- **Infrastructure:** MagicBlock Ephemeral Rollups, Helius APIs
+
+## Project Structure
+
+- `programs/`: Standard Anchor programs for L1 settlement.
+- `programs-ecs/`: Bolt ECS components and ephemeral systems.
+- `frontend/`: Client-side application and rollup interaction logic.
+
+## Getting Started
+
+### Prerequisites
+
+- Rust and Cargo
+- Solana Tool Suite
+- Bolt CLI
+- Node.js and Bun/Yarn
+
+### Backend Setup
+
+Build the specific ephemeral components and systems.
+
+```bash
+bolt build
+```
+
+To run a local simulation environment:
+
+```bash
+bolt test
+```
+
+### Frontend Setup
+
+Navigate to the interface directory and install dependencies.
 
 ```bash
 cd frontend
 bun install
 ```
 
-### 2. Configure Environment Variables
+Configure your environment variables in a `.env` file to include your RPC endpoints (Helius/Solana).
 
-BlitzBet uses the Helius API to bypass CORS blocks on standard crypto endpoints.
-Create a `.env` file in the `frontend` folder:
-
-```bash
-touch frontend/.env
-```
-
-Inside `.env`, insert your Helius API key:
-
-```env
-VITE_HELIUS_API_KEY=your_helius_api_key_here
-```
-
-### 3. Run the Development Server
+Start the development server:
 
 ```bash
 bun dev
 ```
 
-Navigate to `http://localhost:5173` to test the application.
+## Deployment
 
-## 🏗 Architecture
+To deploy for public access, the programs must be deployed to Solana Devnet, and the frontend can be hosted on any static site provider (Vercel, Netlify).
 
-### Entity Component System (ECS)
-
-The smart contract logic (intended for the `/programs-ecs` directory using BOLT CLI) follows strict ECS rules:
-
-- **State (Component)**: A `Prediction` component struct tracking `wager`, `strike_price`, `direction`, and `resolved_status`.
-- **Logic (System)**: A `ResolveSystem` that is explicitly decorated with the `#[ephemeral]` Rust macro, signaling that this system runs exclusively on the MagicBlock Ephemeral Rollup.
-
-### The Pipeline Logic
-
-To read about exactly how the L1 / Ephemeral Rollup context boundaries are handled, please refer to the `PREDICTION_MARKET_ARCHITECTURE.md` file included in the root of this project.
+Ensure your `Anchor.toml` and frontend configuration point to the `devnet` cluster before building for production.
