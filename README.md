@@ -28,14 +28,24 @@ The system utilizes a dual-layer approach to achieve high-frequency interactions
 
 ## Getting Started
 
-### Prerequisites
+### One-Step Setup
+
+Use the included script to check prerequisites, build the backend, install dependencies, and start the frontend.
+
+```bash
+./setup.sh
+```
+
+### Manual Setup
+
+#### Prerequisites
 
 - Rust and Cargo
 - Solana Tool Suite
 - Bolt CLI
 - Node.js and Bun/Yarn
 
-### Backend Setup
+#### Backend Setup
 
 Build the specific ephemeral components and systems.
 
