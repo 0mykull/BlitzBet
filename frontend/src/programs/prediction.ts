@@ -13,19 +13,26 @@ export const BLITZBET_PROGRAM_ID = new PublicKey(
 export const BLITZBET_IDL: any = {
   version: "0.1.0",
   name: "blitzbet",
+  address: "9PsgRUyaxqZBbCKXELZuu3sPVzzuw8S7xxFUNkycoDfB",
+  metadata: {
+    address: "9PsgRUyaxqZBbCKXELZuu3sPVzzuw8S7xxFUNkycoDfB",
+  },
   instructions: [
     {
       name: "initialize",
+      discriminator: [175, 175, 109, 31, 13, 152, 155, 237],
       accounts: [
-        { name: "prediction", isMut: true, isSigner: true },
-        { name: "signer", isMut: true, isSigner: true },
-        { name: "systemProgram", isMut: false, isSigner: false },
+        { name: "prediction", writable: true, signer: true },
+        { name: "signer", writable: true, signer: true },
+        { name: "systemProgram" },
       ],
       args: [
         {
           name: "args",
           type: {
-            defined: "InitializeArgs",
+            defined: {
+              name: "InitializeArgs",
+            },
           },
         },
       ],
@@ -50,14 +57,18 @@ export const BLITZBET_IDL: any = {
 export const IDL: any = {
   version: "0.1.0",
   name: "prediction",
+  address: "B3fMRhqjewwf938pybLncA4o1wErSvzMhQfGg7EkDani",
+  metadata: {
+    address: "B3fMRhqjewwf938pybLncA4o1wErSvzMhQfGg7EkDani",
+  },
   instructions: [
     {
       name: "resolve",
+      discriminator: [246, 150, 236, 206, 108, 63, 58, 10],
       accounts: [
         {
           name: "prediction",
-          isMut: true,
-          isSigner: false,
+          writable: true,
         },
       ],
       args: [
@@ -71,6 +82,12 @@ export const IDL: any = {
   accounts: [
     {
       name: "Prediction",
+      discriminator: [0, 0, 0, 0, 0, 0, 0, 0],
+    },
+  ],
+  types: [
+    {
+      name: "Prediction",
       type: {
         kind: "struct",
         fields: [
@@ -82,5 +99,4 @@ export const IDL: any = {
       },
     },
   ],
-  types: [],
 };

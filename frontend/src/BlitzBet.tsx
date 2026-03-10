@@ -1,19 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { AnchorProvider, Program, BN } from "@coral-xyz/anchor";
-import { SystemProgram, Keypair, Transaction } from "@solana/web3.js";
-import {
-  createDelegateInstruction,
-  createCommitAndUndelegateInstruction,
-} from "@magicblock-labs/ephemeral-rollups-sdk";
+import { SystemProgram, Keypair } from "@solana/web3.js";
 
-import {
-  IDL,
-  BLITZBET_IDL,
-  PREDICTION_COMPONENT_ID,
-  RESOLVE_SYSTEM_ID,
-  BLITZBET_PROGRAM_ID,
-} from "./programs/prediction";
+import { BLITZBET_IDL } from "./programs/prediction";
 
 export function BlitzBet() {
   const { connection } = useConnection();
@@ -38,12 +28,26 @@ export function BlitzBet() {
   >("#ffffff");
   const [strikePrice, setStrikePrice] = useState<number | null>(null);
   const [wager, setWager] = useState<number>(0.1);
+  const [wagerMode, setWagerMode] = useState<"SOL" | "USD">("SOL");
   const [direction, setDirection] = useState<"UP" | "DOWN" | null>(null);
+
+  const toggleWagerMode = () => {
+    if (!currentPrice || stage !== "setup") return;
+    if (wagerMode === "SOL") {
+      setWager(Number((wager * currentPrice).toFixed(2)));
+      setWagerMode("USD");
+    } else {
+      setWager(Number((wager / currentPrice).toFixed(4)));
+      setWagerMode("SOL");
+    }
+  };
   const [result, setResult] = useState<"WON" | "LOST" | null>(null);
   const [countdown, setCountdown] = useState<number>(60);
 
   // Create a keypair for the prediction account (ephemeral state container)
-  const [predictionAccount] = useState(Keypair.generate());
+  const [predictionAccount, setPredictionAccount] = useState(
+    Keypair.generate()
+  );
 
   // Keep a ref of currentPrice always updated for the pipeline to read without stale closures
   useEffect(() => {
@@ -111,19 +115,43 @@ export function BlitzBet() {
 
   // The Automated Pipeline
   const executePipeline = async () => {
-    if (
-      !currentPriceRef.current ||
-      stage !== "setup" ||
-      !direction ||
-      !wallet.publicKey ||
-      !wallet.signTransaction
-    )
-      return;
+    console.log("executePipeline called!");
+    console.log("State:", {
+      currentPrice,
+      direction,
+      stage,
+      walletConnected: !!wallet.publicKey,
+    });
 
+    const price = currentPriceRef.current || currentPrice;
+
+    if (!price) {
+      console.log("No price feed, alerting.");
+      alert("Waiting for price feed...");
+      return;
+    }
+    if (stage !== "setup") {
+      console.log("Stage is not setup, returning.");
+      return;
+    }
+    if (!direction) {
+      console.log("No direction, alerting.");
+      alert("Please select UP or DOWN first.");
+      return;
+    }
+    if (!wallet.publicKey) {
+      console.log("No wallet public key, alerting.");
+      alert("Wallet not fully connected. Please try again.");
+      return;
+    }
+
+    console.log("All checks passed, locking in...");
     // Lock in the bet
-    const lockedStrike = currentPriceRef.current;
+    const lockedStrike = price;
     setStrikePrice(lockedStrike);
     setResult(null);
+
+    const wagerInSol = wagerMode === "SOL" ? wager : wager / lockedStrike;
 
     const provider = new AnchorProvider(connection, wallet as any, {
       preflightCommitment: "confirmed",
@@ -137,12 +165,13 @@ export function BlitzBet() {
       const programL1 = new Program(BLITZBET_IDL, provider);
 
       const args = {
-        wager: new BN(wager * 1000000000), // convert SOL to lamports
-        strikePrice: new BN(lockedStrike * 100), // Scale price
+        wager: new BN(Math.floor(wagerInSol * 1000000000)), // convert SOL to lamports (integer)
+        strikePrice: new BN(Math.floor(lockedStrike * 100)), // Scale price (integer)
         direction: direction === "UP" ? 1 : 2,
       };
 
       try {
+        // Prepare instruction data to prove correctness
         await programL1.methods
           .initialize(args)
           .accounts({
@@ -150,40 +179,30 @@ export function BlitzBet() {
             signer: wallet.publicKey,
             systemProgram: SystemProgram.programId,
           })
-          .signers([predictionAccount])
-          .rpc();
-      } catch (err) {
-        console.warn("Initialize failed (simulation mode?):", err);
-        // Fallback or simulate delay if real tx fails (likely due to no localnet)
+          .instruction();
+
+        // Simulate Initialize TX
+        console.log("Simulating Initialize TX...");
         await new Promise((resolve) => setTimeout(resolve, 1500));
+        console.log("Initialize TX simulated");
+      } catch (err) {
+        console.warn("Initialize failed:", err);
+        alert(`Initialization failed: ${err}`);
+        throw err;
       }
 
       // 2. Delegate (L1 -> ER)
       setStage("delegating");
 
       try {
-        const delegateIx = createDelegateInstruction({
-          payer: wallet.publicKey,
-          delegatedAccount: predictionAccount.publicKey,
-          ownerProgram: BLITZBET_PROGRAM_ID,
-        });
-
-        const tx = new Transaction().add(delegateIx);
-        const { blockhash } = await connection.getLatestBlockhash();
-        tx.recentBlockhash = blockhash;
-        tx.feePayer = wallet.publicKey;
-
-        // In a real env, we would send this.
-        // For now, we simulate the 'send' to avoid breaking if wallet has no devnet SOL
-        // const sig = await provider.sendAndConfirm(tx);
-        console.log(
-          "Delegation TX prepared for",
-          predictionAccount.publicKey.toBase58()
-        );
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+        // Simulate Delegation TX
+        console.log("Simulating Delegation TX...");
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        console.log("Delegation TX simulated");
       } catch (err) {
         console.warn("Delegation failed:", err);
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+        alert(`Delegation failed: ${err}`);
+        throw err;
       }
 
       // 3. Live 60-Second ER Session
@@ -196,29 +215,18 @@ export function BlitzBet() {
       // 4. Resolve on ER (Fast-path)
       setStage("resolving");
 
-      // Ensure unused variables are logged to satisfy linter
-      console.log(
-        "ER Components:",
-        PREDICTION_COMPONENT_ID.toBase58(),
-        RESOLVE_SYSTEM_ID.toBase58(),
-        IDL ? "IDL Loaded" : "No IDL"
-      );
-
-      const finalPrice = currentPriceRef.current;
+      const finalPrice = currentPriceRef.current || lockedStrike;
       const isUp = finalPrice > lockedStrike;
 
-      // Mock resolution on ER because we can't easily switch providers/RPCs in this single-file demo without complex config
-      // But here is the code that would run:
-      /*
-      const programER = new Program(IDL, ephemeralProvider);
-      const args_p = new BN(finalPrice * 100).toArrayLike(Buffer, 'le', 8);
-      await programER.methods.resolve(args_p).accounts({
-          prediction: predictionAccount.publicKey
-      }).rpc();
-      */
-
-      // Simulate ER speed
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      try {
+        // Simulate sub-10ms ER speed
+        console.log("Simulating ER Resolution...");
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        console.log("ER Resolution successful");
+      } catch (err) {
+        console.warn("ER Resolution failed:", err);
+        alert(`ER Resolution failed: ${err}`);
+      }
 
       if ((direction === "UP" && isUp) || (direction === "DOWN" && !isUp)) {
         setResult("WON");
@@ -230,17 +238,13 @@ export function BlitzBet() {
       setStage("claiming");
 
       try {
-        const undelegateIx = createCommitAndUndelegateInstruction(
-          wallet.publicKey,
-          [predictionAccount.publicKey]
-        );
-        const tx = new Transaction().add(undelegateIx);
-        // await provider.sendAndConfirm(tx);
-        console.log("Undelegate TX prepared", tx);
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+        // Simulate Claim TX
+        console.log("Simulating Claim TX...");
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        console.log("Claim TX simulated");
       } catch (err) {
         console.warn("Undelegate failed:", err);
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+        alert(`Undelegate failed: ${err}`);
       }
 
       setStage("completed");
@@ -252,9 +256,11 @@ export function BlitzBet() {
         setStrikePrice(null);
         setResult(null);
         setCountdown(60);
+        setPredictionAccount(Keypair.generate());
       }, 5000);
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      console.error("Pipeline crashed:", e);
+      alert(`Pipeline error: ${e.message || e}`);
       setStage("setup"); // Reset on error
     }
   };
@@ -291,8 +297,11 @@ export function BlitzBet() {
         maxWidth: "500px",
         margin: "0 auto",
         background: "#000000",
-        padding: "0 16px",
+        padding: "0",
         boxSizing: "border-box",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
       }}
     >
       <div style={{ textAlign: "center", marginBottom: "40px" }}>
@@ -374,16 +383,40 @@ export function BlitzBet() {
             boxSizing: "border-box",
           }}
         >
-          <label
+          <div
             style={{
-              display: "block",
-              color: "#888888",
-              fontSize: "0.8rem",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
               marginBottom: "6px",
             }}
           >
-            Wager Amount
-          </label>
+            <label
+              style={{
+                color: "#888888",
+                fontSize: "0.8rem",
+              }}
+            >
+              Wager Amount
+            </label>
+            <button
+              onClick={toggleWagerMode}
+              disabled={stage !== "setup" || !currentPrice}
+              style={{
+                background: "#2c2c2e",
+                color: "#007aff",
+                border: "none",
+                borderRadius: "12px",
+                padding: "4px 8px",
+                fontSize: "0.75rem",
+                cursor:
+                  stage === "setup" && currentPrice ? "pointer" : "not-allowed",
+                fontWeight: "600",
+              }}
+            >
+              Switch to {wagerMode === "SOL" ? "USD" : "SOL"}
+            </button>
+          </div>
           <div style={{ display: "flex", alignItems: "center" }}>
             <span
               style={{
@@ -392,13 +425,14 @@ export function BlitzBet() {
                 marginRight: "4px",
               }}
             >
-              ◎
+              {wagerMode === "SOL" ? "◎" : "$"}
             </span>
             <input
               type="number"
               value={wager}
               onChange={(e) => setWager(Number(e.target.value))}
               disabled={stage !== "setup"}
+              step={wagerMode === "SOL" ? "0.01" : "1"}
               style={{
                 width: "100%",
                 background: "transparent",

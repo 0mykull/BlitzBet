@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   ConnectionProvider,
   WalletProvider,
@@ -20,6 +20,16 @@ import "./App.css";
 
 function WalletConnectionWrapper({ children }: { children: React.ReactNode }) {
   const { connected } = useWallet();
+  const [showPopup, setShowPopup] = useState(false);
+
+  useEffect(() => {
+    if (connected) {
+      setShowPopup(true);
+      // Auto-hide popup after 5 seconds
+      const timer = setTimeout(() => setShowPopup(false), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [connected]);
 
   if (!connected) {
     return (
@@ -66,7 +76,34 @@ function WalletConnectionWrapper({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return <>{children}</>;
+  return (
+    <>
+      {showPopup && (
+        <div
+          style={{
+            position: "fixed",
+            top: "20px",
+            left: "50%",
+            transform: "translateX(-50%)",
+            background: "rgba(0, 209, 70, 0.9)",
+            color: "#ffffff",
+            padding: "12px 24px",
+            borderRadius: "12px",
+            fontSize: "0.9rem",
+            fontWeight: "500",
+            zIndex: 1000,
+            boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+            backdropFilter: "blur(10px)",
+            animation: "slideDown 0.3s ease-out",
+          }}
+        >
+          Proof of Concept: No actual funds will be deducted during
+          transactions!
+        </div>
+      )}
+      {children}
+    </>
+  );
 }
 
 function App() {
@@ -102,17 +139,19 @@ function App() {
               fontFamily:
                 "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               alignItems: "center",
+              justifyContent: "center",
               padding: "2rem 1rem",
+              width: "100%",
+              boxSizing: "border-box",
             }}
           >
             <WalletConnectionWrapper>
               <div
                 style={{
-                  width: "100%",
-                  display: "flex",
-                  justifyContent: "flex-end",
-                  maxWidth: "600px",
-                  marginBottom: "20px",
+                  position: "absolute",
+                  top: "20px",
+                  right: "20px",
+                  zIndex: 50,
                 }}
               >
                 <WalletMultiButton
@@ -121,10 +160,21 @@ function App() {
                     border: "1px solid #333",
                     fontSize: "0.85rem",
                     height: "40px",
+                    borderRadius: "12px",
                   }}
                 />
               </div>
-              <BlitzBet />
+              <div
+                style={{
+                  width: "100%",
+                  maxWidth: "500px",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                }}
+              >
+                <BlitzBet />
+              </div>
             </WalletConnectionWrapper>
           </div>
         </WalletModalProvider>
